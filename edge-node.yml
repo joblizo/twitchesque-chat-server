@@ -1,0 +1,101 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Twitchesque Chat Edge Node Infrastructure'
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, prod]
+  InstanceType:
+    Type: String
+    Default: t2.micro
+    AllowedValues: [t2.micro]
+    Description: Free tier eligible instance type
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+
+Resources:
+  EdgeNodeSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for chat edge nodes
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: 0.0.0.0/0
+
+  EdgeNodeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AutoScalingFullAccess
+        - arn:aws:iam::aws:policy/AmazonEC2FullAccess
+        - arn:aws:iam::aws:policy/AmazonSNSFullAccess
+        - arn:aws:iam::aws:policy/AmazonSQSFullAccess
+
+  EdgeNodeInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref 'InstanceType'
+      ImageId: !Ref 'LatestAmiId'
+      SecurityGroupIds: 
+        - !Ref EdgeNodeSecurityGroup
+      IamInstanceProfile: !Ref EdgeNodeInstanceProfile
+      UserData:
+        Fn::Base64: 
+          !Sub 
+            - |
+              #!/bin/bash
+              # Install NVM and Node.js
+              curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+              source ~/.nvm/nvm.sh
+              nvm install 22.11.0
+
+              # Install Redis
+              amazon-linux-extras install redis6
+              systemctl start redis
+              systemctl enable redis
+
+              # Application setup
+              mkdir -p /opt/twitchesque-chat
+              cd /opt/twitchesque-chat
+
+              # Environment variables
+              cat << EOF > .env
+              PORT=3000
+              REDIS_URL=redis://localhost:6379
+              NODE_ENV=${Environment}
+              AWS_REGION=${Region}
+              EOF
+            - { Environment: !Ref 'EnvironmentName', Region: !Ref 'AWS::Region' }
+
+  EdgeNodeInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref EdgeNodeRole
+
+Outputs:
+  InstanceId:
+    Description: ID of the EC2 instance
+    Value: !Ref EdgeNodeInstance
+  PublicDNS:
+    Description: Public DNS of the EC2 instance
+    Value: !GetAtt EdgeNodeInstance.PublicDnsName

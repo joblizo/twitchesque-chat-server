@@ -1,0 +1,24 @@
+{
+  "name": "twitchesque-chat-server",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@aws-sdk/client-auto-scaling": "^3.684.0",
+    "@aws-sdk/client-ec2": "^3.683.0",
+    "@aws-sdk/client-sns": "^3.682.0",
+    "@aws-sdk/client-sqs": "^3.682.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "redis": "^4.7.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3",
+    "ws": "^8.18.0"
+  }
+}
